@@ -1,0 +1,124 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r}
+# Greeshma Chowdary Peddineni
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(readr)
+library(forcats)
+```
+
+
+
+```{r}
+new_now_covid_22 <- readRDS("C:/Users/Dell/Downloads/covid22.rds")
+```
+
+Let's find how many different vaccine manufacturers are there?
+```{r}
+uniq_manufacturers <- unique(new_now_covid_22$VAX_MANU)
+num_manufacturers <- length(uniq_manufacturers)
+
+cat("There are", num_manufacturers, "different COVID-19 vaccine manufacturers:\n")
+cat(paste("", uniq_manufacturers), sep = "\t")
+
+```
+
+Create a plot to show adverse events by month for each manufacturer
+```{r}
+new_now_covid_22 <- new_now_covid_22 %>%
+  mutate(RECVDATE = as.Date(RECVDATE, format="%Y-%m-%d"),
+         Month = floor_date(RECVDATE, "month"))  
+
+monthly_events <- new_now_covid_22 %>%
+  group_by(Month, VAX_MANU) %>%
+  summarise(Event_Count = n(), .groups = 'drop')
+
+ggplot(monthly_events, aes(x = Month, y = Event_Count, color = VAX_MANU)) +
+  geom_line(size = 2) +  
+  labs(title = "Monthly Adverse Events Reported by month for each Vaccine Manufacturer",
+       x = "Reported Month",
+       y = "Number of Adverse Events",
+       color = "Vaccine Manufacturer") +
+  theme_light() +  
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +  
+  scale_color_manual(values = c("MODERNA" = "orange",
+                                "PFIZER\\BIONTECH" = "yellow",   
+                                "JANSSEN" = "green",
+                                "NOVAVAX" = "red",
+                                "UNKNOWN MANUFACTURER" = "violet"),
+                     na.translate = FALSE) +  
+  theme(plot.title = element_text(face = "bold", size = 10),  
+        axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+Let's see which state had the highest number of events?
+```{r}
+new_now_covid_22 <- new_now_covid_22 %>%
+  mutate(
+    STATE = as.character(STATE),  
+    STATE = trimws(STATE)         
+  )
+
+invisible(unique(new_now_covid_22$STATE))
+
+state_event_counts <- new_now_covid_22 %>%
+  filter(!is.na(STATE) & STATE != "") %>% 
+  group_by(STATE) %>%
+  summarise(Event_Count = n(), .groups = 'drop') %>%
+  arrange(desc(Event_Count))  
+
+highest_state <- state_event_counts[1, ]
+
+cat("The state with the highest number of reported events is", highest_state$STATE, 
+    "with", highest_state$Event_Count, "events.\n")
+```
+
+For Idaho, Texas, and Michigan, show number of events by gender?
+```{r}
+selected_states <- c("TX", "MI", "ID")
+filtered_data <- new_now_covid_22 %>% filter(STATE %in% selected_states)
+
+
+gender_counts <- filtered_data %>%
+  group_by(STATE, SEX) %>%
+  summarise(Event_Count = n(), .groups = 'drop')
+
+gender_counts
+```
+
+
+Let's find how many ER/ED visits were reported?
+```{r}
+er_ed_visits_count <- new_now_covid_22 %>%
+  filter(!is.na(ER_ED_VISIT) & ER_ED_VISIT != "") %>%
+  nrow()
+
+cat("Total ER/ED visits reported:", er_ed_visits_count, "\n")
+```
+
+Which manufacturer is associated with the lowest number of reported ER/ED visits?
+```{r}
+manufacturer_er_ed_counts <- new_now_covid_22 %>%
+  filter(ER_ED_VISIT == TRUE | ER_ED_VISIT == "Y") %>%
+  group_by(VAX_MANU) %>%
+  summarise(ER_ED_Visit_Count = n(), .groups = 'drop')
+
+
+low_manufacturer <- manufacturer_er_ed_counts %>%
+  arrange(ER_ED_Visit_Count) %>%
+  slice(1)
+
+cat(low_manufacturer$VAX_MANU, "manufacturer is associated with the lowest number of reported ER/ED with", low_manufacturer$ER_ED_Visit_Count, "visits.")
+```
+
+
+
